@@ -102,19 +102,43 @@ curl -o NUL -w "%%{http_code}\n" http://127.0.0.1:30141/api/models
 
 在跑 `npm run dev` 的那個終端機視窗按 **`Ctrl + C`**，需要確認時按 `Y`。
 
-如果那個視窗已經關掉、但埠 30141 還被佔用：
+如果那個視窗已經關掉、但埠 30141 還被佔用（幂等，沒在監聽時不會報錯）：
 
 ```powershell
-Get-NetTCPConnection -LocalPort 30141 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+$conn = Get-NetTCPConnection -LocalPort 30141 -State Listen -ErrorAction SilentlyContinue
+if ($conn) {
+  $conn | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+  "已終止佔用 30141 的行程"
+} else {
+  "30141 沒有在監聽（不需處理）"
+}
 ```
 
-確認已釋放：
+確認已釋放（**要一起篩 `LISTENING`**）：
 
 ```bat
-netstat -ano | findstr :30141
+netstat -ano | findstr "LISTENING" | findstr ":30141"
 ```
 
 （沒有輸出 = 已釋放）
+
+> ⚠️ **不要只跑 `netstat -ano | findstr :30141`。** 剛關掉伺服器時，瀏覽器那些已經斷開的連線會留下
+> `TIME_WAIT` 的殘影，看起來很像「還在跑」：
+>
+> ```
+> TCP  127.0.0.1:50669   127.0.0.1:30141   TIME_WAIT  0
+>              ↑ 本機 5xxxx      ↑ 遠端才是 30141     ↑ PID 0
+> ```
+>
+> 那是**客戶端**的 socket（local port 是 5xxxx，remote 才是 30141，擁有者 PID 0），不佔用 30141，
+> 幾分鐘內自己消失。同理，`Get-NetTCPConnection` 在找不到符合物件時是**丟例外**
+> （`找不到相符的 MSFT_NetTCPConnection 物件`），不是回空值——那個「錯誤」等於「沒東西可殺」。
+>
+> 想知道埠到底空不空，最直接的方式是試綁定：
+>
+> ```bat
+> node -e "const n=require('net'),s=n.createServer();s.once('error',e=>{console.log('佔用中：',e.code);process.exit(1)});s.listen(30141,'127.0.0.1',()=>{console.log('可以綁定，埠是空閒的');s.close()})"
+> ```
 
 ---
 
@@ -170,6 +194,8 @@ npm run dev:lan
 | --- | --- |
 | **第一次開頁面很慢（約 50 秒）** | 正常。`next dev` 要即時編譯整個應用（Next 49s + 應用程式碼 1.8s）。之後同一頁重載約 **0.1 秒** |
 | `Error: Port 30141 is already in use` | 上一個 dev server 還在跑。用 [第 3 節](#3-停止服務) 的指令清掉，或直接沿用那個視窗 |
+| `Get-NetTCPConnection … 找不到相符的 MSFT_NetTCPConnection 物件` | **不是錯誤**：代表 30141 沒有在監聽，也就沒有東西可殺（該 cmdlet 找不到時是丟例外而非回空值）。詳見 [第 3 節](#3-停止服務) |
+| `netstat` 還看得到 `:30141` | 若狀態是 `TIME_WAIT` 且 local port 是 5xxxx、PID 0，那是瀏覽器端的殘影，不是伺服器；看 `LISTENING` 才是判準 |
 | 頁面出現 `Module ... factory is not available` 覆蓋層 | 通常是**那個分頁**的 HMR 圖過期，不是原始碼壞掉。先按 `Ctrl + Shift + R` 重新載入，再比對伺服器 log 與直接打 API |
 | `⚠️ next build` 把 dev 弄壞 | **不要在 `npm run dev` 還開著時跑 `npm run build`**，它會改寫 `.next/`。這是專案 `AGENTS.md` 明確禁止的 |
 | `next dev` 一直往 `AGENTS.md` 附加區塊 | Next 16 的工具輸出（`BEGIN:nextjs-agent-rules`）。`git status` 會看到它被修改，**不要**把它混進無關的 commit；`git checkout -- AGENTS.md` 可還原，下次跑 dev 會再出現 |
