@@ -4,6 +4,9 @@
 > 逐區的設計決策、踩過的坑與維護規則，仍然在 [`AGENTS.md`](../../AGENTS.md) 與
 > [`docs/agents/*.md`](../agents/) 裡；本目錄負責把它們串成一個可以從頭讀到尾的故事，
 > 而不是取代它們。
+>
+> 只想把服務跑起來、停掉或排錯的話，看 **[00-run-locally.md](00-run-locally.md)** 就好，
+> 不需要讀完整份架構。
 
 ## Pi Web 是什麼
 
@@ -177,6 +180,9 @@ sequenceDiagram
 
 ## 閱讀順序
 
+要先跑起來（可選）：**[00-run-locally.md](00-run-locally.md)** —— 本機執行手冊，
+跑起來、停止、環境變數、疑難排解。不是架構說明。
+
 1. **[01-runtime.md](01-runtime.md)** — 行程怎麼起來、AgentSession 生命週期、SSE、session 檔與快取。
 2. **[02-api.md](02-api.md)** — `app/api/**` 全部路由與 agent 命令的目錄。
 3. **[03-frontend.md](03-frontend.md)** — AppShell、hooks、串流、訊息渲染、側邊欄與右側面板。
@@ -185,6 +191,9 @@ sequenceDiagram
 6. **[06-security.md](06-security.md)** — 密碼驗證、請求來源檢查、檔案邊界與秘密處理。
 
 ## 開發、測試與 demo
+
+> 完整的手冊（停止方式、環境變數、疑難排解、WSL、本機實測紀錄）在
+> **[00-run-locally.md](00-run-locally.md)**。
 
 ```bash
 npm run dev                 # http://127.0.0.1:30141（Turbopack）
